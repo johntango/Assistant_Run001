@@ -34,14 +34,6 @@ const db = getConnection(dbPath);
 // Define global variables focus to keep track of the assistant, file, thread and run
 let focus = { assistant_id: "", assistant_name:"", file_id: "", thread_id: "", message: "", func_name: "", run_id: "", status: "" };
 
-read_focus_from_file = function () {
-    fs.readFile('focus.json', (err, data) => {
-        if (err) throw err;
-        focus = JSON.parse(data);
-        console.log("focus: " + JSON.stringify(focus));
-    });
-}
-
 
 // Middleware to parse JSON payloads in POST requests
 app.use(express.json());
@@ -53,6 +45,95 @@ app.get('/', (req, res) => {
     res.sendFile(path.join(__dirname, '/index.html'));
 });
 
+app.post('/run_assistant', async (req, res) => {
+    let name = "bland";
+    let instructions = req.body.message;
+    tools = [{ type: "code_interpreter" }, { type: "retrieval" }]
+    // this puts a message onto a thread and then runs the assistant on that thread
+        let assistant_id;
+        let run_id;
+        let messages = [];
+        const openai = new OpenAI({
+            apiKey: process.env.OPENAI_API_KEY,
+        });
+        let thread = await openai.beta.threads.create()
+        let thread_id = thread.id;
+        const response = await openai.beta.assistants.list({
+            order: "desc",
+            limit: 10,
+        })
+        // loop over all assistants and find the one with the name name
+        for(obj in response.data){
+            let assistant = response.data[obj];
+            // change assistant.name to small letters
+            if(assistant.name.toLowerCase() == name){
+                assistant_id = assistant.id;
+                break
+            }
+        }
+    
+        async function runAssistant(assistant_id, thread_id, user_instructions){
+            try {
+                await openai.beta.threads.messages.create(thread_id,
+                    {
+                        role: "user",
+                        content: user_instructions,
+                    })
+                let run = await openai.beta.threads.runs.create(thread_id, {
+                    assistant_id: assistant_id
+                })
+                run_id = run.id;
+                focus.run_id = run_id;
+                focus.assistant_id = assistant_id;
+                focus.thread_id = thread_id;
+
+                await get_run_status(thread_id, run_id);
+                // now retrieve the messages
+                let message = await openai.beta.threads.messages.list(thread_id)
+                addLastMessagetoArray(message, messages)
+            }
+            catch (error) {
+                console.log(error);
+                return error;
+            }
+        }
+        async function get_run_status(thread_id, run_id) {
+            try {
+                let response = await openai.beta.threads.runs.retrieve(thread_id, run_id)
+                let message = response;
+                focus.status = response.status;
+                let tries = 0;
+                while (response.status == 'in_progress' && tries < 10) {
+                    await new Promise(resolve => setTimeout(resolve, 2000)); // Wait for 1 second
+                    response = await openai.beta.threads.runs.retrieve(thread_id, run_id);
+                    tries += 1;
+                }
+                if (response.status === "requires_action") {
+                 get_and_run_tool(response);
+                }
+                
+                if (response.status == "completed" || response.status == "failed") {
+                    
+                }
+                // await openai.beta.threads.del(thread_id)
+                return
+            }
+            catch (error) {
+                console.log(error);
+                return error; 
+            }
+        }
+        function addLastMessagetoArray(message, messages){
+            messages.push(message.data[0].content[0].text.value)
+            console.log("PRINTING MESSAGES: ");
+            console.log(message.data[0].content[0].text.value)
+            return;
+        }
+        
+        await runAssistant(assistant_id, thread_id, instructions);
+        res.status(200).json({ message: messages, focus: focus });
+    }
+)
 // Define routes
 app.post('/create_assistant', async (req, res) => {
     let name = req.body.assistant_name;
@@ -61,7 +142,7 @@ app.post('/create_assistant', async (req, res) => {
         let response = await openai.beta.assistants.create({
             name: name,
             instructions:
-                `You are a ${name} assistant. You develop a multi-step strategy to solve a specific problem by calling the tools provided in a given order one at a time. You output the tools calls into a JSON document called PLAN. You will start by calling the first tool. Once the tool has been called and returns a response it should be removed from the PLAN, the PLAN updated so the next tool is provide in its input instructions the output from the previous tool, and the run terminated as complete. Every time you are called you will read the plan to determine which function to call next along with its instructions.  Once no tools are left to call you will return the message 'Strategy Completed'::\n\n`,
+                `You are a helpful ${name} assistant. You will obey instructions and output both the input and your response'::\n\n`,
             tools: tools,
             model: "gpt-4-1106-preview",
         });
@@ -72,7 +153,6 @@ app.post('/create_assistant', async (req, res) => {
         );
         focus.assistant_id = response.id;
         focus.assistant_name = response.name;
-        write_focus_to_file(focus);
         assistants[response.name] = response;
         message = `${response.name} Assistant created with id: ${response.id}`;
         res.status(200).json({ message: message, focus: focus });
@@ -256,7 +336,6 @@ app.post('/create_thread', async (req, res) => {
         message = response;
         console.log("create_thread response: " + JSON.stringify(response));
         focus.thread_id = response.id;
-        write_focus_to_file(focus);
         res.status(200).json({ message: message, focus: focus });
     }
     catch (error) {
@@ -314,39 +393,7 @@ app.post('/run_status', async (req, res) => {
             tries += 1;
         }
         if (response.status === "requires_action") {
-
-            console.log("run status response: " + JSON.stringify(message));
-            // extract function to be called from response
-            const toolCalls = response.required_action.submit_tool_outputs.tool_calls;
-            let toolOutputs = []
-            let functions_available = await getFunctions();
-            for (let toolCall of toolCalls) {
-                console.log("toolCall: " + JSON.stringify(toolCall));
-                functionName = toolCall.function.name;
-                // get function from functions_available
-                let functionToExecute = functions_available[`${functionName}`];
-
-                if (functionToExecute.execute) {
-                    let args = JSON.parse(toolCall.function.arguments);
-                    let argsArray = Object.keys(args).map((key) => args[key]);
-                    let functionResponse = await functionToExecute.execute(...argsArray);
-                    toolOutputs.push({
-                        tool_call_id: toolCall.id,
-                        output: JSON.stringify(functionResponse)
-                    });
-                    let text = JSON.stringify({ message: `function ${functionName} called`, focus: focus });
-                    res.write(text);
-                    await openai.beta.threads.runs.submitToolOutputs(
-                        thread_id,
-                        run_id,
-                        {
-                            tool_outputs: toolOutputs
-                        }
-                    );
-                }
-                continue;
-            }
-
+         get_and_run_tool(response);
         }
         
         if (response.status == "completed" || response.status == "failed") {
@@ -360,7 +407,38 @@ app.post('/run_status', async (req, res) => {
         res.status(500).json({ message: 'Run Status failed' }, focus);
     }
 })
+// requires action is a special case where we need to call a function
+async function get_and_run_tool(response){
+    // extract function to be called from response
+    const toolCalls = response.required_action.submit_tool_outputs.tool_calls;
+    let toolOutputs = []
+    let functions_available = await getFunctions();
+    for (let toolCall of toolCalls) {
+        console.log("toolCall: " + JSON.stringify(toolCall));
+        functionName = toolCall.function.name;
+        // get function from functions_available
+        let functionToExecute = functions_available[`${functionName}`];
 
+        if (functionToExecute.execute) {
+            let args = JSON.parse(toolCall.function.arguments);
+            let argsArray = Object.keys(args).map((key) => args[key]);
+            let functionResponse = await functionToExecute.execute(...argsArray);
+            toolOutputs.push({
+                tool_call_id: toolCall.id,
+                output: JSON.stringify(functionResponse)
+            });
+            let text = JSON.stringify({ message: `function ${functionName} called`, focus: focus });
+            await openai.beta.threads.runs.submitToolOutputs(
+                thread_id,
+                run_id,
+                {
+                    tool_outputs: toolOutputs
+                }
+            );
+        }
+        continue;
+    }
+}
 
 app.post('/delete_run', async (req, res) => {
     let thread_id = req.body.thread_id;
