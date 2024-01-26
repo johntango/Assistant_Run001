@@ -1,6 +1,7 @@
-# Assistant Conversation Manager Mark 0.0.1
+# Run Assistant Mark 0.0.1
 
 jrw@mit.edu (email me if you find issues)
+This version spins up an Assistant with general GPT4 capabilities for teaching purposes
 Thanks to following for their tools
 
 ## YouTube Video https://youtu.be/1dWdqAAOJeY
@@ -34,15 +35,15 @@ A typical run first run the web server "node server.js". This should popup a bro
 
 ### Assistants
 
-The first row is for the Assistant. Click Create Assistant to create a new Assistant (after the first time you can just use List to load an existing Assistant) You should see the Assistant_ID in the output
+Run Assistant now creates Assistant+Thread+Message+Run and outputs GPT response
 
 ### Files
 
-For now don't load a file. You can load a file later. Its a two step process. First Create and then Attach to an Assistant.
+No files for now
 
 ### Threads
 
-Next create a Thread - you should see the Thread_ID in the output. We use a single thread but you can run more. We place messages onto a thread and responses are added to the thread.
+We create a single thread
 
 ### Tools
 
@@ -50,7 +51,7 @@ Now go to Add Tools which will add all the Tools in the function directory + the
 
 ### Messages
 
-Now create a Message. Try this one "What is the weather in Boston?"
+We take the Prompt and send it to the thread
 
 ### Runs
 
