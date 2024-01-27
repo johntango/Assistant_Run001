@@ -44,21 +44,27 @@ app.use(express.json());
 app.get('/', (req, res) => {
     res.sendFile(path.join(__dirname, '/index.html'));
 });
-
+//
+// Run 
 app.post('/run_assistant', async (req, res) => {
-    let name = "bland";
+    let name = "bland";  // we could get this from req.body
     let instructions = req.body.message;
     
     tools = [{ type: "code_interpreter" }, { type: "retrieval" }]
     // this puts a message onto a thread and then runs the assistant on that thread
-    let assistant_id;
     let run_id;
     let messages = [];
     const openai = new OpenAI({
         apiKey: process.env.OPENAI_API_KEY,
     });
-    let thread = await openai.beta.threads.create()
-    let thread_id = thread.id;
+    focus.assistant_id = await create_or_get_assistant(name);
+    focus.thread_id = await create_or_get_thread()
+   
+    await runAssistant(focus.assistant_id, focus.thread_id, instructions, messages);
+    res.status(200).json({ message: messages, focus: focus });
+});
+
+async function create_or_get_assistant(name){
     const response = await openai.beta.assistants.list({
         order: "desc",
         limit: 10,
@@ -72,9 +78,24 @@ app.post('/run_assistant', async (req, res) => {
             break
         }
     }
-    await runAssistant(assistant_id, thread_id, instructions, messages);
-    res.status(200).json({ message: messages, focus: focus });
-});
+    return assistant_id
+}
+async function create_or_get_thread(){
+    if(focus.thread_id == ""){
+        let response = await openai.beta.threads.create(
+            /*messages=[
+            {
+              "role": "user",
+              "content": "Create data visualization based on the trends in this file.",
+              "file_ids": [focus.file_id]
+            }
+          ]*/
+        )
+        focus.thread_id = response.id;
+    }
+    return focus.thread_id
+}
+    
 
 // Define routes
 app.post('/create_assistant', async (req, res) => {
@@ -423,17 +444,30 @@ app.post('/get_messages', async (req, res) => {
     let run_id = focus.run_id;
     console.log("get_messages: on thread_id: " + thread_id + " run_id: " + run_id);
     try {
-        let messages = await get_run_status(thread_id, run_id);
-        console.log("PRINTING MESSAGES: ");
-        console.log(messages.data[0].content[0].text.value)
-        focus.status = "completed";
-        res.status(200).json({ message: messages.data[0].content[0].text.value, focus: focus });
+       
+        await get_run_status(thread_id, run_id);
+        // now retrieve the messages
+        let response = await openai.beta.threads.messages.list(thread_id)
+        let all_messages = get_all_messages(response);
+        res.status(200).json({ message: all_messages, focus: focus });
     }
     catch (error) {
         console.log(error);
         res.status(500).json({ message: 'Get messages failed' });
     }
 });
+function get_all_messages(response){
+    let all_messages = [];
+    let role = "";
+    let content = "";
+    for (let message of response.data) {
+        // pick out role and content
+        role = message.role;
+        content = message.content[0].text.value;
+        all_messages.push({role, content});
+    }
+    return all_messages
+}
 //
 // this puts a message onto a thread and then runs the assistant 
 async function runAssistant(assistant_id,thread_id,user_instructions,messages){
@@ -459,7 +493,6 @@ async function runAssistant(assistant_id,thread_id,user_instructions,messages){
         console.log(error);
         return error;
     }
-    // Poll the run until it has completed  
 }
 async function get_run_status(thread_id, run_id) {
     try {
@@ -494,11 +527,12 @@ async function get_run_status(thread_id, run_id) {
 //
 function addLastMessagetoArray(message, messages){
     if(message !== undefined){
-    messages.push(message.data[0].content[0].text.value)
-    console.log("PRINTING MESSAGES: ");
-    console.log(message.data[0].content[0].text.value)
+        role = message.data[0].role;
+        content = message.data[0].content[0].text.value;
+        messages.push({role, content});
     }
 }
+
 
 
 app.post('/loop', async (req, res) => {

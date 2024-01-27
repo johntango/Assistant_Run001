@@ -38,22 +38,22 @@
       };
 
       function get_data_from_elements() {
-        data.assistant_id = document.getElementById("assistant_id").value;
+        //data.assistant_id = document.getElementById("assistant_id").value;
         data.assistant_name = document.getElementById("assistant_name").value;
-        data.file_id = document.getElementById("file_id").value;
-        data.thread_id = document.getElementById("thread_id").value;
+        //data.file_id = document.getElementById("file_id").value;
+        //data.thread_id = document.getElementById("thread_id").value;
         data.message = document.getElementById("message").value;
-        data.run_id = document.getElementById("run_id").value;
-        data.status = document.getElementById("run_status").value;
+        //data.run_id = document.getElementById("run_id").value;
+        //data.status = document.getElementById("run_status").value;
       }
       function write_data_to_elements(data) {
-        document.getElementById("assistant_id").value = data.assistant_id;
+        //document.getElementById("assistant_id").value = data.assistant_id;
         document.getElementById("assistant_name").value = data.assistant_name;
-        document.getElementById("file_id").value = data.file_id;
-        document.getElementById("thread_id").value = data.thread_id;
+        //document.getElementById("file_id").value = data.file_id;
+        //document.getElementById("thread_id").value = data.thread_id;
         document.getElementById("message").value = data.message;
-        document.getElementById("run_id").value = data.run_id;
-        document.getElementById("run_status").value = data.status;
+        //document.getElementById("run_id").value = data.run_id;
+        //document.getElementById("run_status").value = data.status;
       }
 
       function write_to_div(route, message) {
@@ -102,27 +102,53 @@
                 />
               </div>
               <div class="col-sm-4">
-                <h4 class="left-side-text">MIT Assistant Builder 0.0.1</h4>
+                <h4 class="left-side-text">MIT Run GPT4 Assistant 0.0.1</h4>
               </div>
             </div>
           </div>
         </section>
         <label for="assistant_id" class="label-container">Assistant</label>
+        <!-- This will also create a new assistant with a new name if we want -->
         <button
           class="btn btn-primary mr-1"
           type="submit"
           onclick="sendRequest('run_assistant')"
         >
-          Create and Run with Prompt
+          Run Assistant with Prompt
         </button>
+
+        <input
+          type="text"
+          id="assistant_name"
+          name="assistant_name"
+          value="Bland"
+        />
+        <label for="message" class="label-container">Prompt Window:</label>
+
+        <input
+          type="text"
+          id="message"
+          name="message"
+          style="width: 100%"
+          value="Enter prompt here"
+        />
+
         <button
           class="btn btn-primary mr-1"
           type="submit"
-          onclick="sendRequest('create_assistant')"
+          onclick="sendRequest('get_messages')"
         >
-          Create
+          Get Messages on Thread
         </button>
-        <input type="text" id="assistant_name" name="assistant_name" />
+        <label for="func_name" class="label-container">Add Tools:</label>
+        <button
+          class="btn btn-primary mr-1"
+          type="submit"
+          onclick="sendRequest('list_tools')"
+        >
+          Add Tools
+        </button>
+        <!-- 
         <button
           class="btn btn-primary mr-1"
           type="submit"
@@ -259,9 +285,11 @@
         >
           Vector DB
         </button>
+      -->
         <div>
           <label for="response">Response from GPT:</label>
         </div>
+
         <div
           id="response"
           style="width: 80%; height: 700px; background: rgb(196, 238, 175)"
