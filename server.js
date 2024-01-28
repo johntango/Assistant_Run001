@@ -53,14 +53,14 @@ app.post('/run_assistant', async (req, res) => {
     tools = [{ type: "code_interpreter" }, { type: "retrieval" }]
     // this puts a message onto a thread and then runs the assistant on that thread
     let run_id;
-    let messages = [];
+    let messages = [];  // this accumulates messages from the assistant
     const openai = new OpenAI({
         apiKey: process.env.OPENAI_API_KEY,
     });
     focus.assistant_id = await create_or_get_assistant(name);
     focus.thread_id = await create_or_get_thread()
    
-    await runAssistant(focus.assistant_id, focus.thread_id, instructions, messages);
+    messages = await runAssistant(focus.assistant_id, focus.thread_id, instructions);
     res.status(200).json({ message: messages, focus: focus });
 });
 
@@ -470,7 +470,7 @@ function get_all_messages(response){
 }
 //
 // this puts a message onto a thread and then runs the assistant 
-async function runAssistant(assistant_id,thread_id,user_instructions,messages){
+async function runAssistant(assistant_id,thread_id,user_instructions){
     try {
         await openai.beta.threads.messages.create(thread_id,
             {
@@ -484,10 +484,10 @@ async function runAssistant(assistant_id,thread_id,user_instructions,messages){
         focus.run_id = run_id;
         focus.assistant_id = assistant_id;
         focus.thread_id = thread_id;
-        await get_run_status(thread_id, run_id);
+        await get_run_status(thread_id, run_id); // blocks until run is completed
         // now retrieve the messages
         let response = await openai.beta.threads.messages.list(thread_id)
-        messages.push(get_all_messages(response));
+        return get_all_messages(response);
         
     }
     catch (error) {
