@@ -486,8 +486,9 @@ async function runAssistant(assistant_id,thread_id,user_instructions,messages){
         focus.thread_id = thread_id;
         await get_run_status(thread_id, run_id);
         // now retrieve the messages
-        let message = await openai.beta.threads.messages.list(thread_id)
-        addLastMessagetoArray(message, messages);
+        let response = await openai.beta.threads.messages.list(thread_id)
+        messages.push(get_all_messages(response));
+        
     }
     catch (error) {
         console.log(error);

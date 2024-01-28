@@ -39,7 +39,7 @@
 
       function get_data_from_elements() {
         //data.assistant_id = document.getElementById("assistant_id").value;
-        data.assistant_name = document.getElementById("assistant_name").value;
+        //data.assistant_name = document.getElementById("assistant_name").value;
         //data.file_id = document.getElementById("file_id").value;
         //data.thread_id = document.getElementById("thread_id").value;
         data.message = document.getElementById("message").value;
@@ -48,7 +48,7 @@
       }
       function write_data_to_elements(data) {
         //document.getElementById("assistant_id").value = data.assistant_id;
-        document.getElementById("assistant_name").value = data.assistant_name;
+        //document.getElementById("assistant_name").value = data.assistant_name;
         //document.getElementById("file_id").value = data.file_id;
         //document.getElementById("thread_id").value = data.thread_id;
         document.getElementById("message").value = data.message;
@@ -131,6 +131,7 @@
       async function parse_response(route, response) {
         data = response.focus;
         write_data_to_elements(data);
+        console.log(`In UI response: ${JSON.stringify(response)}`);
         write_to_div(route, response.message);
       }
     </script>
@@ -167,12 +168,6 @@
           Run Assistant with Prompt
         </button>
 
-        <input
-          type="text"
-          id="assistant_name"
-          name="assistant_name"
-          value="Bland"
-        />
         <label for="message" class="label-container">Prompt Window:</label>
 
         <input
@@ -180,7 +175,7 @@
           id="message"
           name="message"
           style="width: 100%"
-          value="Enter prompt here"
+          value="Enter prompt"
         />
 
         <button
@@ -190,6 +185,7 @@
         >
           Get Messages on Thread
         </button>
+        <!-- 
         <label for="func_name" class="label-container">Add Tools:</label>
         <button
           class="btn btn-primary mr-1"
@@ -198,7 +194,7 @@
         >
           Add Tools
         </button>
-        <!-- 
+     
         <button
           class="btn btn-primary mr-1"
           type="submit"
